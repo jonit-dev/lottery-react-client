@@ -1,31 +1,76 @@
 import "bulma/css/bulma.min.css";
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
-import { Spinner } from "./components/effects/Spinner";
+import { ShowAsync } from "./components/effects/ShowAsync";
+import { EnterPool } from "./components/pages/main/EnterPool";
 import { lotteryContract } from "./contracts/lottery/lotteryContract";
 import "./css/global.css";
+import { contractHelper } from "./libs/ContractHelper";
 import { ILotteryContract } from "./types/LotteryContractTypes";
 
 function App() {
-  const [lotterySCData, setLotterySCData] = useState<ILotteryContract>({
-    manager: "",
-    players: [],
-  });
+  const [lotterySCData, setLotterySCData] = useState<ILotteryContract>();
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [currentAccount, setCurrentAccount] = useState<string>();
+  const [isJoiningPool, setIsJoiningPool] = useState<boolean>(false);
+  const [isManager, setIsManager] = useState<boolean>(true);
+
+  const hasJoinedPool =
+    currentAccount && lotterySCData?.players.includes(currentAccount);
 
   useEffect(() => {
     (async () => {
-      setIsLoading(true);
-      const manager = await lotteryContract.methods.manager().call();
-      setIsLoading(false);
-      console.log(manager);
-
-      setLotterySCData((prev) => ({
-        ...prev,
-        manager,
-      }));
+      await refreshSCData();
     })();
   }, []);
+
+  const refreshSCData = async () => {
+    const manager = await lotteryContract.methods.manager().call();
+    const players = await lotteryContract.methods.getPlayers().call();
+    const balance = await contractHelper.web3.eth.getBalance(
+      lotteryContract.options.address
+    );
+
+    setIsLoading(true);
+
+    setCurrentAccount(await contractHelper.currentAccount);
+
+    setIsManager((await contractHelper.currentAccount) === manager);
+
+    setIsLoading(false);
+
+    setLotterySCData((prev) => ({
+      ...prev,
+      players,
+      manager,
+      balance,
+    }));
+  };
+
+  const onEnterPool = async () => {
+    setIsJoiningPool(true);
+    try {
+      await lotteryContract.methods.enter().send({
+        from: currentAccount,
+        value: contractHelper.web3.utils.toWei("0.011", "ether"),
+      });
+      await refreshSCData();
+      setIsJoiningPool(false);
+    } catch (error) {
+      setIsJoiningPool(false);
+    }
+  };
+
+  const onPickWinner = async () => {
+    try {
+      await lotteryContract.methods.pickWinner().send({
+        from: currentAccount,
+        gas: "1000000",
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   return (
     <Container>
@@ -36,47 +81,45 @@ function App() {
               <div className="column left">
                 <h1 className="title is-1">Crypto Lottery</h1>
                 <h2 className="subtitle colored is-4">
-                  Join our pool and win some cool prizes!
+                  Join our pool and win some ETH prizes!
                 </h2>
 
-                <p>
-                  Lottery Manager:
-                  {isLoading ? <Spinner /> : lotterySCData.manager}
-                </p>
+                {lotterySCData && (
+                  <>
+                    <p>
+                      This contract is managed by{" "}
+                      <ShowAsync isLoading={isLoading}>
+                        <b> {lotterySCData.manager}</b>
+                      </ShowAsync>
+                    </p>
+                    <p>
+                      There are currently{" "}
+                      <ShowAsync isLoading={isLoading}>
+                        <b>{lotterySCData.players.length}</b>
+                      </ShowAsync>{" "}
+                      people in our pool, competing to a total of{" "}
+                      <ShowAsync isLoading={isLoading}>
+                        <b>
+                          {" "}
+                          {contractHelper.web3.utils.fromWei(
+                            lotterySCData.balance,
+                            "ether"
+                          )}
+                        </b>
+                      </ShowAsync>{" "}
+                      Ether!
+                    </p>
+                  </>
+                )}
               </div>
-              <div className="column right has-text-centered">
-                <h1 className="title is-4">Sign up today</h1>
-                <p className="description">
-                  Lorem ipsum dolor, sit amet consectetur adipisicing elit
-                </p>
-                <form>
-                  <div className="field">
-                    <div className="control">
-                      <input
-                        className="input is-medium"
-                        type="text"
-                        placeholder="Name"
-                      />
-                    </div>
-                  </div>
-                  <div className="field">
-                    <div className="control">
-                      <input
-                        className="input is-medium"
-                        type="email"
-                        placeholder="Email"
-                      />
-                    </div>
-                  </div>
-                  <button className="button is-block is-primary is-fullwidth is-medium">
-                    Submit
-                  </button>
-                  <br />
-                  <small>
-                    <em>Lorem ipsum dolor sit amet consectetur.</em>
-                  </small>
-                </form>
-              </div>
+
+              <EnterPool
+                isManager={isManager}
+                isJoiningPool={isJoiningPool}
+                hasJoinedPool={hasJoinedPool || false}
+                onEnterPool={onEnterPool}
+                onPickWinner={onPickWinner}
+              />
             </div>
           </div>
           <div className="column is-8 is-offset-2">
@@ -174,14 +217,6 @@ function App() {
                     {/* <i class="fas fa-envelope"></i> Font Awesome fontawesome.com */}
                   </span>
                 </div>
-              </div>
-              <div className="level-right">
-                <small
-                  className="level-item"
-                  style={{ color: "var(--textLight)" }}
-                >
-                  © Super Cool Website. All Rights Reserved.
-                </small>
               </div>
             </nav>
           </div>

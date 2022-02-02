@@ -10,10 +10,18 @@ declare global {
 class ContractHelper {
   public web3: Web3;
 
+  public accounts: Promise<string[]>;
+  public currentAccount: Promise<string>;
+
   constructor() {
     window.ethereum.request({ method: "eth_requestAccounts" });
 
     this.web3 = new Web3(window.ethereum);
+
+    this.accounts = this.web3.eth.getAccounts();
+    this.currentAccount = this.web3.eth
+      .getAccounts()
+      .then((accounts) => accounts[0]);
   }
 
   public getContract(abi: AbiItem | AbiItem[], address: string): any {

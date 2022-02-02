@@ -2,12 +2,24 @@ import React from "react";
 import { SpinnerCircular } from "spinners-react";
 import styled from "styled-components";
 
-interface IProps {}
+interface IProps {
+  size?: "small" | "medium" | "large";
+}
 
-export const Spinner: React.FC<IProps> = (props) => {
+export const Spinner: React.FC<IProps> = ({ size = "small" }) => {
+  const sizes = {
+    small: 20,
+    medium: 30,
+    large: 40,
+  };
+
   return (
     <InlineContainer>
-      <SpinnerCircular color="#00c4a7" secondaryColor="#e7fffb" size={20} />
+      <SpinnerCircular
+        color="#00c4a7"
+        secondaryColor="#e7fffb"
+        size={sizes[size]}
+      />
     </InlineContainer>
   );
 };
